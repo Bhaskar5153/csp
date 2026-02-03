@@ -1,16 +1,32 @@
-import google as genai
-from app.utils.prompts import build_prompt
+# app/services/llm.py
+from google import genai
+import os
+from google.genai import types
+from dotenv import load_dotenv
 
-# Configure Gemini
-client = genai.Client(api_key=API_KEY)
+from .prompts import build_prompt, DATA_ANALYST_PROMPT
 
-def classify_ticket(subject: str, description: str):
-    prompt = build_prompt(subject, description)
-    response = client.models.generate_content(prompt)
+load_dotenv()
 
-    # Parse response
-    lines = [line.strip() for line in response.text.strip().split("\n") if line.strip()]
-    ticket_type = next((line.replace("Type:", "").strip() for line in lines if line.startswith("Type:")), "")
-    ticket_priority = next((line.replace("Priority:", "").strip() for line in lines if line.startswith("Priority:")), "")
+api_key = os.getenv("GOOGLE_API_KEY", default="")
+CLIENT = genai.Client(api_key=api_key)
+MODEL_ID = "gemini-2.5-flash"
 
-    return {"ticket_type": ticket_type, "ticket_priority": ticket_priority}
+def generate_response(context: str, question: str, role_prompt: str = DATA_ANALYST_PROMPT):
+    """
+    Generate a response using Gemini with role-specific prompt,
+    dataset context, and user question.
+    """
+    full_prompt = build_prompt(role_prompt, context, question)
+
+    response = CLIENT.models.generate_content(
+        model=MODEL_ID,
+        contents=full_prompt,
+        config={
+            "temperature": 0.2,
+            "max_output_tokens": 4000
+        }
+    )
+    return response.text
+
+
